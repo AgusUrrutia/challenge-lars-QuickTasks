@@ -1,0 +1,15 @@
+.container{
+    background-color: rgb(59, 63, 63);
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    &-proyects{
+        max-width: 50vw;
+        height: 100vh;
+        overflow-y: auto;
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+    }
+}

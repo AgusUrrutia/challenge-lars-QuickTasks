@@ -1,0 +1,21 @@
+<h2 mat-dialog-title>Crear un Proyecto</h2>
+<mat-dialog-content>
+  <div class="form-content">
+    <mat-form-field>
+      <mat-label>Nombre</mat-label>
+      <input matInput [(ngModel)]="name">
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Descripcion</mat-label>
+      <input matInput [(ngModel)]="description">
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Imagen (url)</mat-label>
+      <input matInput [(ngModel)]="imagenUrl">
+    </mat-form-field>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions>
+  <button mat-button color="primary" (click)="agregarProyecto()">Crear</button>
+  <button mat-button mat-dialog-close color="warn">Cerrar</button>
+</mat-dialog-actions>
