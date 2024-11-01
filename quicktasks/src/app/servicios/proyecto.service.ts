@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 import { Proyecto } from '../interfaces/proyecto';
+import { Tarea } from '../interfaces/tarea';
+import { HttpClient } from '@angular/common/http';
 
 @Injectable({
   providedIn: 'root'
@@ -8,61 +10,114 @@ import { Proyecto } from '../interfaces/proyecto';
 export class ProyectoService {
   private proyectosSubject = new BehaviorSubject<Proyecto[]>([]);
   proyectos$: Observable<Proyecto[]> = this.proyectosSubject.asObservable();
+  private baseUrl = 'https://6724140e493fac3cf24d0da6.mockapi.io/api/v1/Project';
 
-  constructor() {
-    const proyectosIniciales: Proyecto[] = [
-      {
-        id: "1",
-        name: "Proyecto Alpha",
-        description: "Este es el primer proyecto de ejemplo, con varias tareas asignadas.",
-        imagenUrl: "https://material.angular.io/assets/img/examples/shiba2.jpg", // URL de imagen
-        tarea: [
-          { id: "1", name: "Tarea 1.1", descripcion: "Completar el análisis inicial del proyecto." },
-          { id: "2", name: "Tarea 1.2", descripcion: "Reunión con el equipo para definir requisitos." },
-          { id: "3", name: "Tarea 1.3", descripcion: "Desarrollar prototipos iniciales." }
-        ]
-      },
-      {
-        id: "2",
-        name: "Proyecto Beta",
-        description: "Proyecto para implementar mejoras en el sistema actual.",
-        imagenUrl: "https://material.angular.io/assets/img/examples/shiba2.jpg", // URL de imagen
-        tarea: [
-          { id: "1", name: "Tarea 2.1", descripcion: "Realizar investigación de mercado." },
-          { id: "2", name: "Tarea 2.2", descripcion: "Actualizar la documentación técnica." }
-        ]
-      },
-      {
-        id: "3",
-        name: "Proyecto Gamma",
-        description: "Desarrollo de una aplicación web interactiva.",
-        imagenUrl: "https://material.angular.io/assets/img/examples/shiba2.jpg", // URL de imagen
-        tarea: [
-          { id: "1", name: "Tarea 3.1", descripcion: "Configurar entorno de desarrollo." },
-          { id: "2", name: "Tarea 3.2", descripcion: "Crear estructura inicial del frontend." },
-          { id: "3", name: "Tarea 3.3", descripcion: "Integrar API de autenticación de usuarios." },
-          { id: "4", name: "Tarea 3.4", descripcion: "Realizar pruebas de usabilidad." }
-        ]
-      }
-    ];
-    this.proyectosSubject.next(proyectosIniciales);
-  }
+  constructor(private http: HttpClient) {}
 
-  agregarProyecto(proyecto: Proyecto): void {
-    const proyectos = this.proyectosSubject.value;
-    this.proyectosSubject.next([...proyectos, proyecto]);
-  }
+  obtenerProyectos(): Observable<Proyecto[]> {
+    return this.http.get<Proyecto[]>(`${this.baseUrl}`).pipe(
+      switchMap((proyectos: Proyecto[]) => {
+        const proyectosConTareas$ = proyectos.map(proyecto =>
+          this.obtenerTareasPorProyectoId(proyecto.id).pipe(
+            map((tareas: Tarea[]) => {
+              proyecto.tarea = tareas; 
+              return proyecto;
+            }),
+            catchError(error => {
+              console.error(`Error al obtener tareas para el proyecto ${proyecto.id}:`, error);
+              proyecto.tarea = [];
+              return of(proyecto);
+            })
+          )
+        );
+  
 
-
-  actualizarProyecto(proyectoActualizado: Proyecto): void {
-    const proyectos = this.proyectosSubject.value.map(proyecto =>
-      proyecto.id === proyectoActualizado.id ? proyectoActualizado : proyecto
+        return forkJoin(proyectosConTareas$);
+      }),
+      tap((proyectosCompletos: Proyecto[]) => {
+        this.proyectosSubject.next(proyectosCompletos);
+      })
     );
-    this.proyectosSubject.next(proyectos);
+  }
+  
+  obtenerTareasPorProyectoId(proyectoId: string): Observable<Tarea[]> {
+    return this.http.get<Tarea[]>(`${this.baseUrl}/${proyectoId}/Task`);
   }
 
-  eliminarProyecto(proyectoId: string): void {
-    const proyectos = this.proyectosSubject.value.filter(proyecto => proyecto.id !== proyectoId);
-    this.proyectosSubject.next(proyectos);
+  agregarProyecto(proyecto: Proyecto): Observable<Proyecto> {
+    return this.http.post<Proyecto>(`${this.baseUrl}`, proyecto).pipe(
+      tap((nuevoProyecto: Proyecto) => {
+        const proyectos = this.proyectosSubject.value;
+        this.proyectosSubject.next([...proyectos, nuevoProyecto]);
+      })
+    );
+  }
+
+  actualizarProyecto(proyectoActualizado: Proyecto): Observable<Proyecto> {
+    return this.http.put<Proyecto>(`${this.baseUrl}/${proyectoActualizado.id}`, proyectoActualizado).pipe(
+      tap((proyecto: Proyecto) => {
+        const proyectos = this.proyectosSubject.value.map(p => 
+          p.id === proyecto.id ? proyecto : p
+        );
+        this.proyectosSubject.next(proyectos);
+      })
+    );
+  }
+
+  eliminarProyecto(proyectoId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${proyectoId}`).pipe(
+      tap(() => {
+        const proyectos = this.proyectosSubject.value.filter(p => p.id !== proyectoId);
+        this.proyectosSubject.next(proyectos);
+      })
+    );
+  }
+
+  agregarTarea(proyectoId: string, tarea: Tarea): Observable<Tarea> {
+    return this.http.post<Tarea>(`${this.baseUrl}/${proyectoId}/Task`, tarea).pipe(
+      tap((nuevaTarea: Tarea) => {
+        const proyectos = this.proyectosSubject.value.map(proyecto => {
+          if (proyecto.id === proyectoId) {
+            return { ...proyecto, tarea: [...proyecto.tarea, nuevaTarea] }; 
+          }
+          return proyecto;
+        });
+        this.proyectosSubject.next(proyectos);
+      })
+    );
+  }
+
+  eliminarTarea(proyectoId: string, tareaId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${proyectoId}/Task/${tareaId}`).pipe(
+      tap(() => {
+        const proyectos = this.proyectosSubject.value.map(proyecto => {
+          if (proyecto.id === proyectoId) {
+            return {
+              ...proyecto,
+              tarea: proyecto.tarea.filter(tarea => tarea.id !== tareaId) 
+            };
+          }
+          return proyecto;
+        });
+        this.proyectosSubject.next(proyectos);
+      })
+    );
+  }
+
+  actualizarTarea(proyectoId: string, tareaActualizada: Tarea): Observable<Tarea> {
+    return this.http.put<Tarea>(`${this.baseUrl}/${proyectoId}/Task/${tareaActualizada.id}`, tareaActualizada).pipe(
+      tap((tarea: Tarea) => {
+        const proyectos = this.proyectosSubject.value.map(proyecto => {
+          if (proyecto.id === proyectoId) {
+            const tareasActualizadas = proyecto.tarea.map(t => 
+              t.id === tarea.id ? tarea : t
+            );
+            return { ...proyecto, tarea: tareasActualizadas };
+          }
+          return proyecto;
+        });
+        this.proyectosSubject.next(proyectos);
+      })
+    );
   }
 }

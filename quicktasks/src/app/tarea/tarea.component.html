@@ -10,7 +10,7 @@
         </mat-panel-description>
         </mat-expansion-panel-header>
         <p>{{tarea.descripcion}}</p>
-        <button mat-button>LIKE</button>
-        <button mat-button>SHARE</button>
+        <button mat-button color="primary" (click)="editarTarea()">Editar</button>
+        <button mat-button color="warn" (click)="eliminarTarea()">Eliminar</button>
     </mat-expansion-panel>
 </mat-accordion>

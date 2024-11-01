@@ -26,10 +26,14 @@ export class AppComponent implements OnInit {
 
   constructor(
     private proyectoService: ProyectoService,
-    public dialog: MatDialog
+    public dialogProyecto: MatDialog
   ) {}
 
   ngOnInit(): void {
+    this.proyectoService.obtenerProyectos().subscribe(proyectos => {
+      this.proyectos = proyectos;
+    })
+
     this.proyectoService.proyectos$.subscribe(proyectos => {
       this.proyectos = proyectos;
     });
@@ -39,7 +43,11 @@ export class AppComponent implements OnInit {
 
 
 
-  openDialog() {
-    this.dialog.open(FormComponent);
+  crearProyecto() {
+    const dialogRef = this.dialogProyecto.open(FormComponent, {
+      data: {
+        crear: true,
+      },
+    });
   }
 }

@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialogActions, MatDialogClose, MatDialogContent, MatDialogTitle } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogActions, MatDialogClose, MatDialogContent, MatDialogRef, MatDialogTitle } from '@angular/material/dialog';
 import { Proyecto } from '../interfaces/proyecto';
 import { ProyectoService } from '../servicios/proyecto.service';
 import {MatSelectModule} from '@angular/material/select';
@@ -20,19 +20,46 @@ import { FormsModule } from '@angular/forms';
 })
 export class FormComponent {
 
-  constructor(private proyectoService: ProyectoService){}
+  constructor(
+    private proyectoService: ProyectoService,
+    public dialogRef: MatDialogRef<ProyectoService>,
+    @Inject(MAT_DIALOG_DATA) public data: {
+      crear: boolean;
+      proyecto: Proyecto,
+    },
+  ){
+    if(!this.data.crear){
+      this.name = this.data.proyecto.name
+      this.description = this.data.proyecto.description
+      this.imagenUrl  = this.data.proyecto.imagenUrl
+    }
+  }
   name: string = '';
   description: string = '';
   imagenUrl: string = '';
 
   agregarProyecto() {
-    const nuevoProyecto: Proyecto = {
-      id: Date.now().toString(), // Generar un ID único basado en la fecha actual
-      name: this.name,
-      description: this.description,
-      tarea: [],
-      imagenUrl: this.imagenUrl // Añadir el campo de imagen si es necesario
+    const proyectoActualizado: Proyecto = {
+      ...this.data.proyecto,
+      name: this.name, // Actualiza el nombre
+      description: this.description // Actualiza la descripción
     };
-    this.proyectoService.agregarProyecto(nuevoProyecto);
+
+    if(this.data.crear){
+
+      const nuevoProyecto: Proyecto = {
+        id: Date.now().toString(), // Generar un ID único basado en la fecha actual
+        name: this.name,
+        description: this.description,
+        tarea: [],
+        imagenUrl: this.imagenUrl // Añadir el campo de imagen si es necesario
+      };
+      this.proyectoService.agregarProyecto(nuevoProyecto).subscribe(data => {
+        console.log("agregar");
+      });
+    }else{
+      this.proyectoService.actualizarProyecto(proyectoActualizado).subscribe()
+    }
+    this.dialogRef.close(proyectoActualizado); 
   }
 }
